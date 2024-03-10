@@ -3,15 +3,17 @@
  *
  * Copyright (c)2021 Hermit Retro Products <https://hermitretro.com>
  *
- * Shift - applies shift + key to be interpreted locally
- * Symbol Shift = CTRL
- * Symbol Shift + Shift = limited remapping
- * EXT1 = Alt
- * EXT2 = Option
+ * Shift - Generally shifted characters except for 5, 6, 7, 8 which act as cursor keys and 0 is DELETE
+ * Symbol Shift - Generally the red characters on each key, except for some cases where the red legend beneath the key is used, e.g., ~
+ * Symbol Shift + Shift = Ctrl on Mac, Option (maybe Command?) on PC
+ * EXT1 = Option on Mac, Ctrl on PC
+ * EXT2 = Alt
+ * Symbol Shift + RETURN = ESCAPE
+ * Shift + RETURN = Tab
  *
- * Todo:
- * - Add "classic" Spectrum layout mode possibly switched in at boot time by holding down
- *   EXT1
+ * If EXT1 is held down at connection of the ZXUSB, it will boot into PC mappings, Mac is default.
+ * You can change the default behaviour around line 96
+ *
  */
 
 #include "Keyboard.h"
@@ -19,49 +21,65 @@
 #define NUM_ROWS 8
 #define NUM_COLS 5
 
+#define SYMBOLSHIFT_ENHANCED 0x00
+#define NULL_KEY 0xFF
+
 /** Unshifted keymap */
 byte keyMap[NUM_ROWS][NUM_COLS] = {
-  { '5', '4', '3', '2', '1' }, 
-  { 't', 'r', 'e', 'w', 'q' }, 
-  { 'g', 'f', 'd', 's', 'a' }, 
-  { '6', '7', '8', '9', '0' }, 
-  { 'y', 'u', 'i', 'o', 'p' },
-  { 'v', 'c', 'x', 'z', 0 }, 
-  { 'h', 'j', 'k', 'l', KEY_RETURN },
-  { 'b', 'n', 'm', '.', ' ' }
+    { '5', '4', '3', '2', '1' }, 
+    { 't', 'r', 'e', 'w', 'q' }, 
+    { 'g', 'f', 'd', 's', 'a' }, 
+    { '6', '7', '8', '9', '0' }, 
+    { 'y', 'u', 'i', 'o', 'p' },
+    { 'v', 'c', 'x', 'z', NULL_KEY }, 
+    { 'h', 'j', 'k', 'l', KEY_RETURN },
+    { 'b', 'n', 'm', '.', ' ' }
 };
 
-/** SHIFT keymap */
-byte keyMapShifted[NUM_ROWS][NUM_COLS] = {
-  { KEY_LEFT_ARROW, '$', '\\', '@', KEY_ESC }, 
-  { 'T', 'R', 'E', 'W', 'Q' }, 
-  { 'G', 'F', 'D', 'S', 'A' }, 
-  { KEY_DOWN_ARROW, KEY_UP_ARROW, KEY_RIGHT_ARROW, '!', KEY_BACKSPACE }, 
-  { 'Y', 'U', 'I', 'O', 'P' },
-  { 'V', 'C', 'X', 'Z', 0 }, 
-  { 'H', 'J', 'K', 'L', KEY_F5 },
-  { 'B', 'N', 'M', ',', '#' }
+/** Classic SHIFT keymap */
+byte keyMapShiftedSpectrum[NUM_ROWS][NUM_COLS] = {
+    { KEY_LEFT_ARROW, '$', '#', '@', KEY_ESC }, 
+    { 'T', 'R', 'E', 'W', 'Q' }, 
+    { 'G', 'F', 'D', 'S', 'A' }, 
+    { KEY_DOWN_ARROW, KEY_UP_ARROW, KEY_RIGHT_ARROW, ')', KEY_BACKSPACE }, 
+    { 'Y', 'U', 'I', 'O', 'P' },
+    { 'V', 'C', 'X', 'Z', NULL_KEY }, 
+    { 'H', 'J', 'K', 'L', KEY_TAB },
+    { 'B', 'N', 'M', ',', '#' }
 };
 
-/** SYMBOL SHIFT keymap */
-byte keyMapSymbolShifted[NUM_ROWS][NUM_COLS] = {
-  { '%', '$', '#', '@', '!' }, 
-  { '>', '<', 'E', 'W', 'Q' }, 
-  { 'G', 'F', 'D', 'S', 'A' }, 
-  { '&', '`', '(', ')', '_' }, 
-  { 'Y', 'U', 'I', ';', '\"' },
-  { '/', '?', '#', ':', 0 }, 
-  { '^', '-', '+', '=', KEY_F5 },
-  { '*', '\'', '.', 0, '#' }
+/** Classic SYMBOL SHIFT keymap */
+byte keyMapSymbolShiftedSpectrum[NUM_ROWS][NUM_COLS] = {
+    { '%', '$', '#', '@', '!' }, 
+    { '>', '<', SYMBOLSHIFT_ENHANCED, SYMBOLSHIFT_ENHANCED, SYMBOLSHIFT_ENHANCED }, 
+    { '}', '{', '\\', '|', '~' }, 
+    { '&', '`', '(', ')', '_' }, 
+    { '[', ']', SYMBOLSHIFT_ENHANCED, ';', '\"' },
+    { '/', '?', '#', ':', NULL_KEY }, 
+    { '^', '-', '+', '=', KEY_ESC },
+    { '*', ',', '.', NULL_KEY, '#' }
+};
+
+/** Classic SYMBOL SHIFT keymap -- enhanced */
+String keyMapSymbolShiftedEnhancedSpectrum[NUM_ROWS][NUM_COLS] = {
+    { "", "", "", "", "" }, 
+    { "", "", ">=", "<>", "<=" }, 
+    { "", "", "", "", "" }, 
+    { "", "", "", "", "" }, 
+    { "", "", "(C)", "", "" }, 
+    { "", "", "", "", "" }, 
+    { "", "", "", "", "" }, 
+    { "", "", "", "", "" }
 };
 
 // define the row and column pins
 uint8_t colPins[NUM_COLS] = {
-  A0, 15, 14, 16, 10
+    A0, 15, 14, 16, 10
 };
 
 uint8_t rowPins[NUM_ROWS] = {
-  9,8, 7, 6, 5, 4, 3, 2 };
+    9,8, 7, 6, 5, 4, 3, 2
+};
 
 #define EXT1_PIN A1
 #define EXT2_PIN A2
@@ -75,12 +93,16 @@ uint8_t rowPins[NUM_ROWS] = {
 #define SYMBOL_SHIFT_ROW 7
 #define SYMBOL_SHIFT_COL 3
 
-#define SYMBOLSHIFT_ACTION KEY_LEFT_CTRL    /** Ctrl */
-#define EXT1_ACTION KEY_LEFT_GUI    /** Option */
-#define EXT2_ACTION KEY_LEFT_ALT    /** Alt */
+/** Mac style */
+typedef enum { VARIANT_PC, VARIANT_MAC } ModifierVariant;
+ModifierVariant variant = VARIANT_MAC;      /** Change this if you don't want to have to press EXT2 at each use */
+#define SHIFT_ACTION KEY_LEFT_SHIFT         /** Shift */
+uint8_t SHIFTSYMSHIFT_ACTION = KEY_LEFT_CTRL;
+uint8_t EXT1_ACTION = KEY_LEFT_GUI;
+uint8_t EXT2_ACTION = KEY_LEFT_ALT;
 
 /** Pressed keys matrix to speed up unpresses... */
-unsigned char keysPressed[NUM_ROWS][NUM_COLS];
+bool keysPressed[NUM_ROWS][NUM_COLS];
 bool shiftPressed = false;
 bool symbolShiftPressed = false;
 bool ext1Pressed = false;
@@ -90,7 +112,7 @@ bool ext2Pressed = false;
 #define GPIO_MEMBRANE_DEBOUNCE_IN_MS 50L
 unsigned long lastEventTime = 0;
 
-#define ZXUSB_VERSION_MAJOR 0
+#define ZXUSB_VERSION_MAJOR 1
 #define ZXUSB_VERSION_MINOR 0
 #define ZXUSB_VERSION_PATCH 0
 
@@ -98,38 +120,90 @@ bool debounceEvent() {
     return (millis() - lastEventTime) < GPIO_MEMBRANE_DEBOUNCE_IN_MS;
 }
 
-/** Press the key */
-void pressKey( uint8_t r, uint8_t c, bool shifted, bool symbolShifted ) {  
+void setVariant() {
 
-    // byte key = shifted ? keyMapShifted[r][c] : (symbolShifted ? keyMapSymbolShifted[r][c] : keyMap[r][c]);    keysPressed[r][c] = 1;
-    byte key = keyMap[r][c];
+    switch ( variant ) {
+        case VARIANT_MAC: {
+            SHIFTSYMSHIFT_ACTION = KEY_LEFT_CTRL;
+            EXT1_ACTION = KEY_LEFT_GUI;
+            EXT2_ACTION = KEY_LEFT_ALT;
+            break;
+        }
+        case VARIANT_PC: {
+            SHIFTSYMSHIFT_ACTION = KEY_LEFT_GUI;
+            EXT1_ACTION = KEY_LEFT_CTRL;
+            EXT2_ACTION = KEY_LEFT_ALT;
+            break;
+        }
+    }
+}
 
-    keysPressed[r][c] = 1;
-    if ( key == '0' && symbolShiftPressed ) {
-        /** Map to backspace */
-        Keyboard.release( SYMBOLSHIFT_ACTION );
-        Keyboard.press( KEY_BACKSPACE );
-        Keyboard.press( SYMBOLSHIFT_ACTION );
+void _handleKey( bool doPress, uint8_t r, uint8_t c ) {
+
+    uint8_t key = 0xFF;
+    String enhancedKey = "";
+
+    if ( shiftPressed ) {
+        if ( symbolShiftPressed ) {
+
+            /** Shift + Symbol Shift */
+            key = keyMap[r][c];
+            enhancedKey = "";
+
+            Keyboard.press( SHIFTSYMSHIFT_ACTION );
+        } else {
+            /** Only shifted */
+            key = keyMapShiftedSpectrum[r][c];                  
+        }
+    } else {
+        /** Not shifted */
+        if ( symbolShiftPressed ) {
+            key = keyMapSymbolShiftedSpectrum[r][c];
+            if ( key == SYMBOLSHIFT_ENHANCED ) {
+                enhancedKey = keyMapSymbolShiftedEnhancedSpectrum[r][c];
+            }
+        } else {
+            /** Completely unmodified (unless EXT1 or EXT2 has been pressed) */
+            key = keyMap[r][c];                          
+        }
+    }
+
+    if ( key == NULL_KEY ) {
         return;
     }
 
-    Keyboard.press( key );
+    if ( enhancedKey.length() > 0 ) {
+        for ( size_t i = 0 ; i < enhancedKey.length() ; i++ ) {
+            if ( doPress ) {
+                Keyboard.press( enhancedKey[i] );        
+            } else {
+                Keyboard.release( enhancedKey[i] );
+            }
+            delay( 25 );
+        }
+    } else {
+        if ( doPress ) {
+            Keyboard.press( key );
+        } else {
+            Keyboard.release( key );
+        }
+    }
+}
+
+/** Press the key */
+void pressKey( uint8_t r, uint8_t c ) {  
+
+    keysPressed[r][c] = true;
+
+    _handleKey( true, r, c );
 }
 
 /** Unpress the key */
-void unpressKey( uint8_t r, uint8_t c, bool shifted, bool symbolShifted ) {  
+void unpressKey( uint8_t r, uint8_t c ) {  
 
-    // byte key = shifted ? keyMapShifted[r][c] : (symbolShifted ? keyMapSymbolShifted[r][c] : keyMap[r][c]);
-    byte key = keyMap[r][c];
+    _handleKey( false, r, c );
 
-    if ( key == '0' && symbolShiftPressed ) {
-        /** Map to backspace */
-        Keyboard.release( KEY_BACKSPACE );
-        return;
-    }
-
-    Keyboard.release( key );
-    keysPressed[r][c] = 0;
+    keysPressed[r][c] = false;
 }
 
 void setup() {
@@ -149,16 +223,27 @@ void setup() {
     pinMode( ZELUX_PWR_PIN, OUTPUT );
     digitalWrite( ZELUX_PWR_PIN, LOW );
 
-    pinMode( EXT1_PIN, INPUT );
-    pinMode( EXT2_PIN, INPUT );
+    pinMode( EXT1_PIN, INPUT_PULLUP );
+    pinMode( EXT2_PIN, INPUT_PULLUP );
 
+    /** Are we using Mac modifiers or PC modifiers? (Default is Mac) */
+    if ( digitalRead( EXT1_PIN) == LOW ) {
+        variant = VARIANT_PC;
+    }
+    Serial1.println( "" );
+    Serial1.print( F("Using variant: ") );
+    Serial1.println( variant == VARIANT_PC ? F("PC") : F("MacOS") );
+
+    setVariant();
+
+    /** Setup default membrane pin states */
     for ( int c = 0 ; c < NUM_COLS ; c++ ) {
         pinMode( colPins[c], INPUT );
         digitalWrite( colPins[c], HIGH );
 
         for (byte r = 0; r < NUM_ROWS; r++) {
             pinMode( rowPins[r], INPUT );
-            keysPressed[r][c] = 0;
+            keysPressed[r][c] = false;
         }
     }
 
@@ -172,15 +257,17 @@ void loop() {
         return;
     }
 
+    /** Handle SHIFT/SYM SHIFT here in case we're pressing both to go into a modifier mode */
+    bool shouldReleaseShift = false;
+    bool shouldReleaseSymshift = false;
+
     /** Check for SHIFT */
     pinMode( rowPins[SHIFT_ROW], OUTPUT );
     bool lshiftPressed = (digitalRead( colPins[SHIFT_COL]) == LOW );
     pinMode( rowPins[SHIFT_ROW], INPUT );
-    if ( lshiftPressed ) {
-        Keyboard.press( KEY_LEFT_SHIFT );
-    } else {
+    if ( !lshiftPressed ) {
         if ( shiftPressed ) {
-            Keyboard.release( KEY_LEFT_SHIFT );
+            shouldReleaseShift = true;
         }
     }
     shiftPressed = lshiftPressed;
@@ -189,15 +276,16 @@ void loop() {
     pinMode( rowPins[SYMBOL_SHIFT_ROW], OUTPUT );
     bool lsymbolShiftPressed = (digitalRead( colPins[SYMBOL_SHIFT_COL]) == LOW );
     pinMode( rowPins[SYMBOL_SHIFT_ROW], INPUT );
-
-    if ( lsymbolShiftPressed ) {
-        Keyboard.press( SYMBOLSHIFT_ACTION );
-    } else {
+    if ( !lsymbolShiftPressed ) {
         if ( symbolShiftPressed ) {
-            Keyboard.release( SYMBOLSHIFT_ACTION );
+            shouldReleaseSymshift = true;
         }
     }
     symbolShiftPressed = lsymbolShiftPressed;
+
+    if ( shouldReleaseShift || shouldReleaseSymshift ) {
+        Keyboard.release( SHIFTSYMSHIFT_ACTION );
+    }
 
     /** Check for EXT1 */
     bool lext1Pressed = (digitalRead( EXT1_PIN ) == LOW );
@@ -236,12 +324,12 @@ void loop() {
             }
 
             if ( digitalRead( colPins[c] ) == LOW ) {
-                pressKey( r, c, shiftPressed, symbolShiftPressed );
+                pressKey( r, c );
             } else {
                 if ( keysPressed[r][c] ) {
-                    unpressKey( r, c, shiftPressed, symbolShiftPressed );
+                    unpressKey( r, c );
                 }
-                keysPressed[r][c] = 0;
+                keysPressed[r][c] = false;
             }
         }
 
